@@ -1,0 +1,21 @@
+{
+  "name": "reservehub24",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @reservehub/web --filter @reservehub/api dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @reservehub/web test:e2e",
+    "db:migrate": "pnpm --filter @reservehub/api db:migrate",
+    "db:seed": "pnpm --filter @reservehub/api db:seed"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "@typescript-eslint/parser": "^8.18.0"
+  }
+}

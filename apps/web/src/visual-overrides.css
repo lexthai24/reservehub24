@@ -1,0 +1,14 @@
+.visual-icon {
+  position: absolute;
+  top: 55px;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 55px;
+  height: 55px;
+  border: 5px solid #ffffffcc;
+  border-radius: 16px;
+  transform: translateX(-50%) rotate(-5deg);
+  background: #ffffffdd;
+  box-shadow: 0 7px 15px #4541661c;
+}
