@@ -21,6 +21,7 @@ export const resourceSchema = z.object({
   location: z.string().max(160).nullable().optional(),
   capacity: z.number().int().positive().max(500).nullable().optional(),
   timezone: z.string().min(1).max(80),
+  status: z.enum(["ACTIVE", "ARCHIVED"]).optional(),
 });
 
 export const bookingSchema = z.object({

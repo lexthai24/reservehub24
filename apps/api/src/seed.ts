@@ -1,3 +1,4 @@
+import "./env.js";
 import { db, pool } from "./db/client.js";
 import { auditLogs, bookings, notifications, resources, users, waitingList } from "./db/schema.js";
 import { hashPassword } from "./auth.js";

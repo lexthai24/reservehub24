@@ -33,6 +33,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/api/auth/logout", async (_request, reply) => { reply.clearCookie("reservehub_session", { path: "/" }); return { data: { success: true } }; });
   app.get("/api/auth/me", { preHandler: app.authenticate }, async (request) => ({ data: request.authUser }));
+  app.patch("/api/auth/me", { preHandler: app.authenticate }, async (request) => {
+    const input = registerSchema.pick({ fullName: true }).parse(request.body);
+    const [user] = await db.update(users).set({ fullName: input.fullName, updatedAt: new Date() }).where(eq(users.id, request.authUser!.id)).returning({ id: users.id, email: users.email, fullName: users.fullName, role: users.role });
+    if (!user) notFound("User not found");
+    return { data: { ...user, role: user.role as "MEMBER" | "ADMIN" } };
+  });
 
   app.get("/api/resources", async (request) => {
     const query = request.query as { q?: string; type?: string; status?: string; location?: string; minCapacity?: string; page?: string; pageSize?: string };
