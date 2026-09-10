@@ -6,6 +6,7 @@ import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import { ZodError } from "zod";
 import { env } from "./env.js";
 import { configureAuth } from "./auth.js";
 import { registerRoutes } from "./routes.js";
@@ -23,6 +24,10 @@ export function buildApp() {
   void registerRoutes(app);
   app.get("/health", async () => ({ status: "ok", service: "reservehub-api" }));
   app.setErrorHandler((error, request, reply) => {
+    if (error instanceof ZodError) {
+      void reply.code(400).send({ error: "VALIDATION_ERROR", message: "Request data is invalid", details: error.flatten().fieldErrors, requestId: request.id });
+      return;
+    }
     const statusCode = typeof error === "object" && error !== null && "statusCode" in error && typeof error.statusCode === "number" ? error.statusCode : 500;
     const message = statusCode < 500 && error instanceof Error ? error.message : "Unexpected server error";
     request.log.error({ err: error, requestId: request.id }, "request failed");

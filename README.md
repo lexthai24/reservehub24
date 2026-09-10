@@ -5,9 +5,10 @@ ReserveHub is a SaaS resource booking platform for meeting rooms, desks, equipme
 ## Included
 
 - Cookie-based JWT authentication with Argon2 password hashing and role-aware API authorization.
+- Self-service password changes and admin password resets with session invalidation and audit logging. Forgot-password requests are intentionally handled by the company's administrator.
 - Resource search/filtering, booking creation, idempotency keys, cancellation, waiting lists, notifications, analytics, and admin/audit endpoints.
 - PostgreSQL `tstzrange` exclusion constraint backed by `btree_gist` to prevent overlapping confirmed bookings under concurrent writes.
-- React dashboard with responsive navigation, resource explorer, calendar, booking modal, analytics charts, admin console, empty states, and accessible feedback.
+- React dashboard with responsive navigation, account/workspace menus, resource explorer, calendar, booking modal, analytics charts, admin console, password controls, empty states, and accessible feedback.
 - Shared Zod schemas and tested availability, waiting-list, and top-K utilities.
 
 ## Local setup
@@ -59,4 +60,4 @@ See `.env.example`. Production deployments must use a long random `JWT_SECRET`, 
 
 ## Future improvements
 
-Add refresh-token rotation, CSRF tokens for cross-site deployments, Redis-backed rate-limit storage, cursor pagination for very large histories, background wait-list fulfillment, email notifications, and full database-backed React Query hooks in the web client. The current frontend is intentionally self-contained for a reliable portfolio demo while the API is ready for integration.
+Add refresh-token rotation, CSRF tokens for cross-site deployments, Redis-backed rate-limit storage, cursor pagination for very large histories, background wait-list fulfillment, and email notifications as the deployment scale requires.

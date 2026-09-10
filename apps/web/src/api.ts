@@ -3,7 +3,7 @@ import type { LoginInput, RegisterInput, ResourceInput, UserRole } from "@reserv
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 
 export interface ApiUser { id: string; email: string; fullName: string; role: UserRole; }
-export interface ApiResource { id: string; name: string; description: string | null; resourceType: string; location: string | null; capacity: number | null; timezone: string; status: "ACTIVE" | "ARCHIVED"; createdAt: string; updatedAt: string; }
+export interface ApiResource { id: string; name: string; description: string | null; imageUrl: string | null; resourceType: string; location: string | null; capacity: number | null; timezone: string; status: "ACTIVE" | "ARCHIVED"; createdAt: string; updatedAt: string; }
 export interface ApiBooking { id: string; resourceId: string; userId: string; startsAt: string; endsAt: string; status: "CONFIRMED" | "CANCELLED" | "COMPLETED"; notes: string | null; idempotencyKey: string | null; resource: ApiResource; }
 export interface ApiNotification { id: string; type: string; title: string; message: string; readAt: string | null; createdAt: string; }
 export interface ApiWaitingListEntry { id: string; resourceId: string; userId: string; requestedStart: string; requestedEnd: string; priority: number; status: string; createdAt: string; }
@@ -36,6 +36,7 @@ export const api = {
   register: (input: RegisterInput) => request<ApiUser>("/auth/register", jsonBody(input)),
   logout: () => request<{ success: boolean }>("/auth/logout", jsonBody({})),
   updateProfile: (fullName: string) => request<ApiUser>("/auth/me", { method: "PATCH", body: JSON.stringify({ fullName }) }),
+  changePassword: (input: { currentPassword: string; newPassword: string }) => request<{ success: boolean }>("/auth/change-password", jsonBody(input)),
   resources: (params: { status?: "ACTIVE" | "ARCHIVED"; q?: string; type?: string } = {}) => {
     const query = new URLSearchParams();
     if (params.status) query.set("status", params.status);
@@ -62,5 +63,6 @@ export const api = {
   peakHours: () => request<ApiPeakHour[]>("/analytics/peak-hours"),
   adminUsers: () => request<ApiAdminUser[]>("/admin/users"),
   updateUserRole: (userId: string, role: UserRole) => request<{ id: string; role: UserRole }>(`/admin/users/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  resetUserPassword: (userId: string, newPassword: string) => request<{ success: boolean }>(`/admin/users/${userId}/password`, { method: "PATCH", body: JSON.stringify({ newPassword }) }),
   auditLogs: () => request<ApiAuditLog[]>("/admin/audit-logs"),
 };

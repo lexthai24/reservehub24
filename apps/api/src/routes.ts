@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gt, gte, ilike, isNull, lt, or, sql } from "drizzle
 import { db } from "./db/client.js";
 import { auditLogs, bookings, notifications, resources, users, waitingList } from "./db/schema.js";
 import { hashPassword, setSession, verifyPassword } from "./auth.js";
-import { BookingStatus, ResourceStatus, UserRole, bookingSchema, loginSchema, registerSchema, resourceSchema, updateRoleSchema, waitingListSchema } from "@reservehub/shared";
+import { BookingStatus, ResourceStatus, UserRole, adminPasswordSchema, bookingSchema, changePasswordSchema, loginSchema, registerSchema, resourceSchema, updateRoleSchema, waitingListSchema } from "@reservehub/shared";
 
 function badRequest(message: string): never { throw Object.assign(new Error(message), { statusCode: 400 }); }
 function notFound(message: string): never { throw Object.assign(new Error(message), { statusCode: 404 }); }
@@ -17,27 +17,38 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     if (existing) conflict("An account with this email already exists");
     const [user] = await db.insert(users).values({ email, passwordHash: await hashPassword(input.password), fullName: input.fullName, role: UserRole.MEMBER }).returning({ id: users.id, email: users.email, fullName: users.fullName, role: users.role });
     if (!user) throw new Error("Unable to create user");
-    const authUser = { ...user, role: user.role as "MEMBER" | "ADMIN" };
+    const authUser = { ...user, role: user.role as "MEMBER" | "ADMIN", sessionVersion: 0 };
     await setSession(reply, authUser);
-    return reply.code(201).send({ data: authUser });
+    return reply.code(201).send({ data: { id: authUser.id, email: authUser.email, fullName: authUser.fullName, role: authUser.role } });
   });
 
   app.post("/api/auth/login", { config: { rateLimit: { max: 10, timeWindow: "15 minutes" } } }, async (request, reply) => {
     const input = loginSchema.parse(request.body);
     const [user] = await db.select().from(users).where(eq(users.email, input.email.toLowerCase())).limit(1);
     if (!user || !(await verifyPassword(user.passwordHash, input.password))) return reply.code(401).send({ error: "INVALID_CREDENTIALS", message: "Email or password is incorrect" });
-    const authUser = { id: user.id, email: user.email, fullName: user.fullName, role: user.role as "MEMBER" | "ADMIN" };
-    await setSession(reply, authUser);
-    return { data: authUser };
+    const authUser = { id: user.id, email: user.email, fullName: user.fullName, role: user.role as "MEMBER" | "ADMIN", sessionVersion: user.sessionVersion };
+    await setSession(reply, authUser, input.rememberMe);
+    return { data: { id: authUser.id, email: authUser.email, fullName: authUser.fullName, role: authUser.role } };
   });
 
   app.post("/api/auth/logout", async (_request, reply) => { reply.clearCookie("reservehub_session", { path: "/" }); return { data: { success: true } }; });
-  app.get("/api/auth/me", { preHandler: app.authenticate }, async (request) => ({ data: request.authUser }));
+  app.get("/api/auth/me", { preHandler: app.authenticate }, async (request) => ({ data: { id: request.authUser!.id, email: request.authUser!.email, fullName: request.authUser!.fullName, role: request.authUser!.role } }));
   app.patch("/api/auth/me", { preHandler: app.authenticate }, async (request) => {
     const input = registerSchema.pick({ fullName: true }).parse(request.body);
     const [user] = await db.update(users).set({ fullName: input.fullName, updatedAt: new Date() }).where(eq(users.id, request.authUser!.id)).returning({ id: users.id, email: users.email, fullName: users.fullName, role: users.role });
     if (!user) notFound("User not found");
     return { data: { ...user, role: user.role as "MEMBER" | "ADMIN" } };
+  });
+  app.post("/api/auth/change-password", { preHandler: app.authenticate }, async (request, reply) => {
+    const input = changePasswordSchema.parse(request.body);
+    if (input.currentPassword === input.newPassword) badRequest("New password must be different from the current password");
+    const [user] = await db.select({ passwordHash: users.passwordHash, sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, request.authUser!.id)).limit(1);
+    if (!user || !(await verifyPassword(user.passwordHash, input.currentPassword))) return reply.code(400).send({ error: "INVALID_CURRENT_PASSWORD", message: "Current password is incorrect" });
+    const nextSessionVersion = user.sessionVersion + 1;
+    await db.update(users).set({ passwordHash: await hashPassword(input.newPassword), sessionVersion: nextSessionVersion, updatedAt: new Date() }).where(eq(users.id, request.authUser!.id));
+    await db.insert(auditLogs).values({ actorUserId: request.authUser!.id, action: "PASSWORD_CHANGED", entityType: "user", entityId: request.authUser!.id });
+    await setSession(reply, { ...request.authUser!, sessionVersion: nextSessionVersion });
+    return { data: { success: true } };
   });
 
   app.get("/api/resources", async (request) => {
@@ -193,5 +204,16 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/admin/users", { preHandler: [app.authenticate, app.requireAdmin] }, async () => ({ data: await db.select({ id: users.id, email: users.email, fullName: users.fullName, role: users.role, createdAt: users.createdAt }).from(users).orderBy(asc(users.fullName)) }));
   app.patch("/api/admin/users/:userId/role", { preHandler: [app.authenticate, app.requireAdmin] }, async (request) => { const { userId } = request.params as { userId: string }; const input = updateRoleSchema.parse(request.body); const [user] = await db.update(users).set({ role: input.role, updatedAt: new Date() }).where(eq(users.id, userId)).returning({ id: users.id, role: users.role }); if (!user) notFound("User not found"); await db.insert(auditLogs).values({ actorUserId: request.authUser!.id, action: "USER_ROLE_UPDATED", entityType: "user", entityId: userId, metadata: { role: input.role } }); return { data: user }; });
+  app.patch("/api/admin/users/:userId/password", { preHandler: [app.authenticate, app.requireAdmin] }, async (request, reply) => {
+    const { userId } = request.params as { userId: string };
+    const input = adminPasswordSchema.parse(request.body);
+    const [user] = await db.select({ id: users.id, sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!user) notFound("User not found");
+    const nextSessionVersion = user.sessionVersion + 1;
+    await db.update(users).set({ passwordHash: await hashPassword(input.newPassword), sessionVersion: nextSessionVersion, updatedAt: new Date() }).where(eq(users.id, userId));
+    await db.insert(auditLogs).values({ actorUserId: request.authUser!.id, action: "USER_PASSWORD_RESET", entityType: "user", entityId: userId });
+    if (userId === request.authUser!.id) await setSession(reply, { ...request.authUser!, sessionVersion: nextSessionVersion });
+    return { data: { success: true } };
+  });
   app.get("/api/admin/audit-logs", { preHandler: [app.authenticate, app.requireAdmin] }, async () => ({ data: await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100) }));
 }

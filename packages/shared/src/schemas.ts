@@ -12,11 +12,22 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  rememberMe: z.boolean().optional().default(false),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(8).max(128),
+});
+
+export const adminPasswordSchema = z.object({
+  newPassword: z.string().min(8).max(128),
 });
 
 export const resourceSchema = z.object({
   name: z.string().trim().min(2).max(120),
   description: z.string().max(2000).nullable().optional(),
+  imageUrl: z.string().refine((value) => value.startsWith("/") || /^https?:\/\//u.test(value), "Image URL must be a local path or HTTP(S) URL").nullable().optional(),
   resourceType: z.enum([ResourceType.MEETING_ROOM, ResourceType.DESK, ResourceType.EQUIPMENT, ResourceType.STUDIO]),
   location: z.string().max(160).nullable().optional(),
   capacity: z.number().int().positive().max(500).nullable().optional(),
@@ -43,6 +54,8 @@ export const updateRoleSchema = z.object({ role: z.enum([UserRole.MEMBER, UserRo
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type AdminPasswordInput = z.infer<typeof adminPasswordSchema>;
 export type ResourceInput = z.infer<typeof resourceSchema>;
 export type BookingInput = z.infer<typeof bookingSchema>;
 export type WaitingListInput = z.infer<typeof waitingListSchema>;

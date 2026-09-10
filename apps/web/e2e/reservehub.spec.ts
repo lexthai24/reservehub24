@@ -14,8 +14,12 @@ test("member can explore a resource and open the booking flow", async ({ page })
   await page.locator('input[type="email"]').fill("narin@example.com");
   await page.locator('input[type="password"]').fill("Member123!");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText("Good morning, Narin")).toBeVisible();
-  await page.getByRole("button", { name: "Explore" }).first().click();
+  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+  await page.getByRole("button", { name: "Open account menu" }).last().click();
+  await expect(page.getByRole("button", { name: "Change password" })).toBeVisible();
+  await page.getByRole("button", { name: "Change password" }).click();
+  await expect(page.getByRole("heading", { name: "Change password" })).toBeVisible();
+  await page.getByRole("button", { name: "Spaces" }).click();
   await expect(page.getByRole("heading", { name: "Explore resources" })).toBeVisible();
   await page.getByRole("button", { name: "View availability" }).first().click();
   await expect(page.getByText(/Book .+/)).toBeVisible();
